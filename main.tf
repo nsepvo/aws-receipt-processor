@@ -68,3 +68,74 @@ resource "aws_s3_bucket_notification" "uploads" {
 
   depends_on = [aws_sqs_queue_policy.allow_s3]
 }
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = "${path.module}/lambda/lambda_function.py"
+  output_path = "${path.module}/lambda/lambda.zip"
+}
+
+resource "aws_iam_role" "processor_role" {
+  name = "receipt-processor-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "processor_policy" {
+  name = "receipt-processor-lambda-policy"
+  role = aws_iam_role.processor_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+        Resource = aws_sqs_queue.receipts_queue.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.receipts.arn}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "textract:AnalyzeExpense"
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "dynamodb:PutItem"
+        Resource = aws_dynamodb_table.receipts.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_function" "processor" {
+  function_name    = "receipt-processor"
+  role             = aws_iam_role.processor_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  filename         = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  timeout          = 30
+}
+
+resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  event_source_arn = aws_sqs_queue.receipts_queue.arn
+  function_name    = aws_lambda_function.processor.arn
+  batch_size       = 1
+}
