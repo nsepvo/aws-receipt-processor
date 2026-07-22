@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AWS_DEFAULT_REGION: ap-southeast-2
+      TABLE_NAME: receipt-processor-results
     steps:
       - uses: actions/checkout@v4
 
@@ -27,7 +28,9 @@ jobs:
         run: pip install pytest boto3
 
       - name: Run tests
-        run: python -m pytest lambda/ -v
+        run: |
+        python -m pytest lambda/ -v
+        python -m pytest lambda-query/ -v
 
   deploy:
     needs: test
