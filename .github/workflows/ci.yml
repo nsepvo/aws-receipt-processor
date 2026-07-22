@@ -29,8 +29,8 @@ jobs:
 
       - name: Run tests
         run: |
-        python -m pytest lambda/ -v
-        python -m pytest lambda-query/ -v
+          python -m pytest lambda/ -v
+          python -m pytest lambda-query/ -v
 
   deploy:
     needs: test
