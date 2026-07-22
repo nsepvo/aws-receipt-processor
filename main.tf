@@ -310,3 +310,34 @@ resource "aws_s3_object" "index" {
 output "site_url" {
   value = "http://${aws_s3_bucket_website_configuration.frontend.website_endpoint}"
 }
+
+# ---------- Alerting ----------
+
+resource "aws_sns_topic" "alerts" {
+  name = "receipt-processor-alerts"
+}
+
+resource "aws_sns_topic_subscription" "alerts_email" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = "nevenspooner03@example.com"
+}
+
+resource "aws_cloudwatch_metric_alarm" "dlq_not_empty" {
+  alarm_name          = "receipt-processor-dlq-not-empty"
+  alarm_description   = "A receipt failed processing 3 times and landed in the DLQ"
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.receipts_dlq.name
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+}
