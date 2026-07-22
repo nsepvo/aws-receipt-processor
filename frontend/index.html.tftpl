@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receipt Processor</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin-bottom: 0.25rem; }
+    p.sub { color: #666; margin-top: 0; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1.5rem; }
+    th, td { text-align: left; padding: 0.6rem; border-bottom: 1px solid #ddd; }
+    th { background: #f5f5f5; }
+    .status { margin-top: 1.5rem; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Receipt Processor</h1>
+  <p class="sub">Receipts extracted with Amazon Textract</p>
+
+  <button onclick="load()">Refresh</button>
+  <div class="status" id="status">Loading...</div>
+
+  <table id="results" hidden>
+    <thead>
+      <tr><th>Vendor</th><th>Date</th><th>Total</th><th>File</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script>
+    const API_URL = "${api_url}";
+
+    async function load() {
+      const status = document.getElementById("status");
+      const table = document.getElementById("results");
+      const rows = document.getElementById("rows");
+
+      status.textContent = "Loading...";
+      table.hidden = true;
+
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const receipts = data.receipts || [];
+
+        if (receipts.length === 0) {
+          status.textContent = "No receipts processed yet.";
+          return;
+        }
+
+        rows.innerHTML = "";
+        for (const r of receipts) {
+          const tr = document.createElement("tr");
+          for (const field of ["vendor", "date", "total", "receipt_id"]) {
+            const td = document.createElement("td");
+            td.textContent = r[field] || "unknown";
+            tr.appendChild(td);
+          }
+          rows.appendChild(tr);
+        }
+
+        status.textContent = receipts.length + " receipt(s)";
+        table.hidden = false;
+      } catch (err) {
+        status.textContent = "Error loading receipts: " + err.message;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
