@@ -5,6 +5,13 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  backend "s3" { 
+    bucket       = "receipt-processor-tfstate-nevenspooner" 
+    key          = "receipt-processor/terraform.tfstate" 
+    region       = "ap-southeast-2" 
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
